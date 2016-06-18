@@ -1,0 +1,188 @@
+---
+title: 'DATA 621: WEEK 1 ASSIGNMENT'
+author: "MUSA T. GANIYU"
+date: "June 8, 2016"
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+  pdf_document: default
+  tidy: yes
+code_folding: hide
+---
+
+```{r setup}
+
+options(warn = -1)
+
+suppressMessages(require(plotly))
+library(knitr)
+suppressMessages(library(RCurl))
+suppressMessages(library(plyr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(plotly))
+suppressMessages(require(scatterplot3d));
+
+
+
+training <- read.csv("C:/Users/mayowa/Downloads/moneyball-training-data.csv", header = TRUE, sep = ",")
+
+evaluation <- read.csv("C:/Users/mayowa/Downloads/moneyball-evaluation-data.csv", header = TRUE, sep = ",")
+
+str(training)
+dim(training)
+
+
+kable(summary(training))
+```
+
+> The Multiple Linear Regression Equation for the data analysis is:
+
+${ Y }\quad =\quad { B }_{ 0 }\quad +\quad { B }_{ 1 }{ x }_{ 1 }\quad +\quad { B }_{ 2 }{ x }_{ 2 }\quad +\quad$ .........+$\quad { B }_{ n }{ x }_{ n }\quad$ +$\quad { e}\\$
+
+Where,
+
+ $\quad { Y }\quad$ = Reponse or Dependent Variable, 
+
+ $\quad{ x }_{ 1 }$ .....${ x }_{ n }\quad$ = Explantory or Independent Variables 
+
+ $\quad { B }_{ 0 }\quad$ = Intercept,
+
+ $\quad { B }_{ 1 }\quad , ...., \quad { B }_{ n }\quad$ = Slope of Independent variables  or Model Parameter.
+ 
+ $\quad { e}\\$ = Residual or Error term ( the  difference between an actual and a predicted value of y)
+ 
+ 
+
+**Could be re-written in terms of the training dataset as:**
+
+${ Y }\quad =\quad { B }_{ 0 }\quad +\quad { B }_{ target-wins }{ X }_{ target-wins}\quad +\quad { B }_{ team-batting-H }{ X }_{ team-batting-H }\quad +\quad$ .........+$\quad { B }_{ team-fielding-DP }{ X }_{ team-fielding-DP }\quad$ +$\quad { e}\\$
+
+
+
+> A glimpse at the multiple linear regression Analysis:
+
+```{r cars}
+fit1 <- lm(TARGET_WINS ~. -INDEX, data = training) # The Variable INDEX is intentional omitted as it has nothing to do with the analysis
+
+summary(fit1)
+par(mfrow=c(2,2))
+plot(fit1)
+```
+
+
+* A scatter Plot and Correlation co-efficient between TARGET_WINS and TEAM_BATTING_2B
+
+```{R}
+
+plot_ly(data = training, x = TEAM_BATTING_2B , y = TARGET_WINS, mode = "markers",
+        color = "blue", line = list(shape = "linear"))
+
+
+
+plot(TARGET_WINS~TEAM_BATTING_2B, training)
+
+fitline <- lm(training$TARGET_WINS~training$TEAM_BATTING_2B)
+abline(fitline)
+
+
+cor(training$TARGET_WINS, training$TEAM_BATTING_2B)
+
+```
+
+
+> A 3D Scatterplot display for TARGET_WINS, TEAM_BATTING_2B and TEAM_BATTING_BB
+
+```{R}
+
+attach(training);
+
+#Run the this query to display it in 3D
+
+scatterplot3d(TARGET_WINS, TEAM_BATTING_2B, TEAM_BATTING_BB ,pch = 20, highlight.3d = TRUE, type = "h", main = "3D ScatterPlots"); 
+
+
+```
+
+
+* A check for Normality.
+
+```{R}
+hist(training$TARGET_WINS, col="green")
+hist(training$TEAM_FIELDING_DP, col="blue")
+
+```
+
+* We can deduce from the above model that some of the variables are not comtributing meaningfully to the analysis, we therefore proceeded by using a statistical tool for selecting the best model for the analysis. 
+
+* We shall select the best model by using both forward and backward selection process
+
+```{R}
+stepwise <- step(fit1, direction = "both") # Model Selection using both FORWARD AND BACKWARD selection.
+```
+
+
+* The table below depicts the summary of the selected model:
+
+```{R}
+
+summary(stepwise)
+
+```
+
+> The above selection process depicts the best model for the analysis.
+
+
+* A look at the plots.
+
+```{R}
+
+fit2 <- training[, c("TEAM_BATTING_H", "TEAM_PITCHING_HR" , "TEAM_PITCHING_BB", "TEAM_PITCHING_SO", "TEAM_FIELDING_E", "TEAM_FIELDING_DP", "TARGET_WINS", "TEAM_BATTING_HBP")]
+
+par(mfrow=c(2,2))
+plot(fit2)
+```
+
+
+* **NOTE:** One of the variable (**TEAM_BATTING_HBP**) is not contributing significantly to the analysis, we therefore remove the variable and see the effect on the other variables.
+
+```{R}
+
+fit3 <- lm(TARGET_WINS ~. -TEAM_BATTING_HBP, data = fit2)
+
+
+summary(fit3)
+par(mfrow=c(2,2))
+plot(fit3)
+
+```
+
+$\hat { \quad y } =\quad \hat { { \beta  }_{ 0 } } \quad +\quad \hat { { \beta  }_{ 1 }{ x }_{ 1 } } \quad +\quad \hat { { \beta  }_{ 2 }{ x }_{ 2 } } +....+\quad \hat { { \beta  }_{ n }{ x }_{ n } } + \quad \hat {\quad e}$
+
+
+where $\hat { \quad y }$ is the predicted value of y, and ${ \beta  }_{ 0 },\quad { \beta  }_{ 1 },\quad { \beta  }_{ 2 }$
+
+are the estimated co-effients.
+
+> **INTERPRETATIONS**
+
+**The least square prediction is:**
+
+**$\hat { \quad y } =\quad 63.4669\quad +\quad 0.0258TEAM_{ B }ATTING_{ H }\quad +\quad 0.0917TEAM_{ P }ITCHING_{ H }R\quad +\quad 0.0561TEAM-{ P }ITCHING-{ B }B\quad -\quad 0.0289TEAM-{ P }ITCHING-{ S }O\quad -\quad 0.1739TEAM-{ F }IELDING-{ E }\quad -\quad 0.1217TEAM-FIELDING-DP$**
+
+
+**The Co-efficient interpretations: First-Order Quantative Variables**
+
+If we increase the TEAM_BATTING_H by one unit, keeping the other variables constant, the mean value of Y increases by 0.0258. Same is applicable for other variables.
+
+
+
+> Analysis of Variance (ANOVA) is adopted here to show the effect and interaction between the variables. 
+  
+  * We shall also obtain there respective confident intervals.
+
+
+```{R}
+anova(fit3, test= "F")
+
+confint(fit3)
