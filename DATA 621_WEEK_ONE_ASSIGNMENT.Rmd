@@ -25,9 +25,9 @@ suppressMessages(require(scatterplot3d));
 
 
 
-training <- read.csv("C:/Users/mayowa/Downloads/moneyball-training-data.csv", header = TRUE, sep = ",")
+training <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/moneyball-training-data.csv", header = TRUE, sep = ",")
 
-evaluation <- read.csv("C:/Users/mayowa/Downloads/moneyball-evaluation-data.csv", header = TRUE, sep = ",")
+evaluation <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/moneyball-training-data.csv", header = TRUE, sep = ",")
 
 str(training)
 dim(training)
