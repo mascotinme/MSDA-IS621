@@ -1,0 +1,357 @@
+---
+title: "Data 621 Week Update"
+author: "MUSA T. GANIYU"
+date: "July 2, 2016"
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+  pdf_document: default
+  tidy: yes
+  word_document: default
+code_folding: hide
+---
+
+
+
+```{r setup, include=FALSE}
+
+options(warn = -1)
+
+suppressMessages(require(plotly))
+library(knitr)
+suppressMessages(library(RCurl))
+suppressMessages(library(plyr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(plotly))
+suppressMessages(require(scatterplot3d))
+suppressMessages(library(Amelia))
+suppressMessages(library(ROCR))
+suppressMessages(library(pROC));
+
+crime <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/crime-training-data.csv", header = TRUE, sep = ",")
+
+crime_evaluation <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/crime-evaluation-data.csv", header = TRUE, sep = ",")
+
+
+```
+
+> Data Exploration:
+
+**Inferential Statistics**
+
+```{R}
+names(crime)
+str(crime)
+dim(crime)
+kable(summary(crime))
+missmap(crime, main = "Missing values vs observed")
+
+```
+
+> 
+
+* The crime dataset contains 14 variables, with 466 observations.
+
+* There are no missing values.
+
+* The Minimum, Quatiles and Maximum values.
+
+
+> THE ANALYZES
+
+* A plot of Lstat against Zn
+```{R}
+
+plot_ly(data = crime, x = zn , y = lstat, mode = "markers",
+        color = "blue", line = list(shape = "linear"))
+```
+
+> Pairing and fitting the general linear model of Target as a response variance, while other variables serves as an explanatory variable (Independent variable)
+
+```{R}
+pairs(crime, col=crime$target)
+
+fit <- glm(target ~., data = crime) 
+```
+
+> A summary of the output 
+
+```{R}
+
+summary(fit)
+par(mfrow=c(2,2))
+plot(fit)
+```
+
+
+> An introduction of Logistics regression for a better results
+
+```{R}
+
+crimetarget <- glm(target~., family=binomial(link='logit'),data=crime)
+
+
+summary(crimetarget)
+par(mfrow=c(2,2))
+plot(crimetarget)
+
+```
+
+
+Although, variables like zn, chas and lstat are not statistically significance due to their p-value being greater than statiscally accepted p-value of 0.5, we can still proceed with our analysis and make some prediction.
+
+
+**Intrepretations:**
+
+Note that the Null **deviance** is 645.88, which implies that if all other parameters are held constant(control or not included), the estimate would be 645.88, while the Residual deviance of 186.15 means with the imclusion of other estimator, we expect the deviance to be 186.14. 
+
+*NB: The greater the difference between the Null deviance and Residual deviance, the better.
+
+
+```{R}
+
+anova(crimetarget, test="Chisq")
+```
+
+The Analysis of Variance above depicts that the "Zn", "indus", "rad" and "noz" contributed significantly to the increment in crime rate in this city under analysis. 
+
+
+
+```{R}
+
+pred <- predict(crimetarget, type="response")
+pred2 <- prediction(pred, crime$target)
+pred3 <- performance(pred2, measure = "tpr", x.measure = "fpr")
+plot(pred3)
+```
+
+Above is the plot for Sensitivity and Specitivity for the city target, while the value below is it AUC.
+
+
+
+```{R}
+auc <- performance(pred2, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+> Predictions and Accuracy.
+
+```{R}
+
+
+target_predicts <- predict(crimetarget,newdata=subset(crime,select=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14)),type='response')
+target_predicts <- ifelse(target_predicts > 0.5,1,0)
+
+attach(crime)
+
+table(target_predicts, target)
+
+misClasificError <- mean(target_predicts != target)
+print(paste('Accuracy',1-misClasificError))
+```
+
+
+> CHAS as a response variable.
+
+
+```{R}
+
+fit2 <- glm(chas ~., data = crime)
+summary(fit2)
+
+par(mfrow=c(2,2))
+plot(fit2)
+```
+
+The Above depicts that on "indus", "tax" and "medv" are staistically significance. We will therefore explore another option: **The Logit.**
+ 
+```{R}
+
+crimechas <- glm(chas~., family=binomial(link='logit'),data=crime)
+summary(crimechas)
+plot(crimechas)
+```
+
+On the case of chas a response variable, the Null and Residual deviance are very close. The "Tax", "rad" and "Indus" have strong association with the crime rate.
+
+```{R}
+anova(crimechas, test="Chisq")
+```
+
+After the Analysis of variance, we see that only "tax" contribute slightly to the crime rate.
+
+```{R}
+predicts <- predict(crimechas, type="response")
+predicts2 <- prediction(predicts, crime$chas)
+predicts3 <- performance(predicts2, measure = "tpr", x.measure = "fpr")
+plot(predicts3)
+```
+
+Above is the Sensitivity and Specitivity plot, while the AUC value is shown below.
+
+```{R}
+auc2 <- performance(predicts2, measure = "auc")
+auc2 <- auc2@y.values[[1]]
+auc2
+
+```
+
+
+Below is the prediction for Chas and its Accuracy
+
+```{R}
+
+chas_predicts <- predict(crimechas,newdata=subset(crime,select=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14)),type='response')
+chas_predicts <- ifelse(chas_predicts > 0.5,1,0)
+
+attach(crime)
+
+table(chas_predicts, chas)
+
+misClasificError <- mean(chas_predicts != chas)
+print(paste('Accuracy',1-misClasificError))
+
+
+```
+
+
+```{R}
+
+
+t <- table(crime[ , c(3,14)])
+colnames(t) <- c('Real Positive', 'Real Negative')
+rownames(t) <- c('Model Positive', 'Model Negative')
+t
+getConfusionMatrix <- function(df) {
+  t <- table(df$chas,df$target)
+  colnames(t) <- c('Real Positive', 'Real Negative')
+  rownames(t) <- c('Model Positive', 'Model Negative')
+
+  return(t)
+}
+
+getAccuracy <- function(df) {
+  cm <- getConfusionMatrix(df)
+
+  tn <- cm["Model Negative", "Real Negative"]
+  fp <- cm["Model Positive", "Real Negative"]
+  fn <- cm["Model Negative", "Real Positive"]
+  tp <- cm["Model Positive", "Real Positive"]
+
+  accuracy <- (tn+tp) / (tn+fp+fn+tp)
+  return(accuracy)
+}
+
+getCER <- function(df) {
+  cm <- getConfusionMatrix(df)
+
+  tn <- cm["Model Negative", "Real Negative"]
+  fp <- cm["Model Positive", "Real Negative"]
+  fn <- cm["Model Negative", "Real Positive"]
+  tp <- cm["Model Positive", "Real Positive"]
+
+  cer <- (fp + fn) / (tn+fp+fn+tp)
+  return(cer)
+}
+
+getPrecision <- function(df) {
+  cm <- getConfusionMatrix(df)
+
+  tn <- cm["Model Negative", "Real Negative"]
+  fp <- cm["Model Positive", "Real Negative"]
+  fn <- cm["Model Negative", "Real Positive"]
+  tp <- cm["Model Positive", "Real Positive"]
+
+  precision <- tp / (fp+tp)
+  return(precision)
+
+}
+
+getSensitivity <- function(df){
+  cm <- getConfusionMatrix(df)
+
+  tn <- cm["Model Negative", "Real Negative"]
+  fp <- cm["Model Positive", "Real Negative"]
+  fn <- cm["Model Negative", "Real Positive"]
+  tp <- cm["Model Positive", "Real Positive"]
+
+  sensitivity <- tp/(tp+fn)
+
+  return(sensitivity)
+}
+
+getSpecificity <- function(df){
+  cm <- getConfusionMatrix(df)
+
+  tn <- cm["Model Negative", "Real Negative"]
+  fp <- cm["Model Positive", "Real Negative"]
+  fn <- cm["Model Negative", "Real Positive"]
+  tp <- cm["Model Positive", "Real Positive"]
+
+  specificity <- tn / (tn+fp) 
+  return(specificity)
+}
+
+getF1Score <- function(df) {
+
+  cm <- getConfusionMatrix(df)
+
+  tn <- cm["Model Negative", "Real Negative"]
+  fp <- cm["Model Positive", "Real Negative"]
+  fn <- cm["Model Negative", "Real Positive"]
+  tp <- cm["Model Positive", "Real Positive"]
+
+  precision <- getPrecision(df)
+  sensitivity <- getSensitivity(df)
+  f1score <- 2* (precision * sensitivity) / (precision+sensitivity)
+
+  return(f1score)
+
+}
+```
+
+Confusion Matrix
+
+```{}
+getConfusionMatrix(crime)
+```
+
+Accuracy
+
+```{R}
+getAccuracy(crime)
+```
+
+CER
+
+```{R}
+getCER(crime)
+```
+
+Precision
+
+```{R}
+getPrecision(crime)
+```
+
+F1Score
+```{R}
+getF1Score(crime)
+```
+
+Specificity
+
+```{R}
+getSpecificity(crime)
+
+```
+
+Sensitivity
+
+```{R}
+getSensitivity(crime);
+
+```
