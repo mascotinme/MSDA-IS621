@@ -3,13 +3,16 @@ title: 'DATA 621: WEEK 1 ASSIGNMENT'
 author: "MUSA T. GANIYU"
 date: "June 8, 2016"
 output:
+  word_document: default
+  pdf_document: default
+  tidy: yes
   html_document:
     highlight: pygments
     theme: cerulean
-  pdf_document: default
-  tidy: yes
 code_folding: hide
 ---
+Introducing the dataset.
+
 
 ```{r setup}
 
@@ -164,7 +167,15 @@ where $\hat { \quad y }$ is the predicted value of y, and ${ \beta  }_{ 0 },\qua
 
 are the estimated co-effients.
 
-> **INTERPRETATIONS**
+> **INTERPRETATIONS:**
+
+**The R Squared:** 
+
+The  Initial Adjusted Rsquare before model selection was 0.5126, while the Adjusted Rsquared after the was .5167. A variable called TEAM_BATTING_HBP was not contributing significantly and was removed, the final Adjusted Rsquare is 0.5109 which shows the model is significance and that the removal of TEAM_BATTING_BP doesnt have any meaniful effect on other variables.
+
+**The P-Value**
+
+* P-Value is sigficance at 2.2e^6, which is very less than the table value (0.05).
 
 **The least square prediction is:**
 
@@ -184,5 +195,14 @@ If we increase the TEAM_BATTING_H by one unit, keeping the other variables const
 
 ```{R}
 anova(fit3, test= "F")
+```
 
+
+> The 95% and 5% confident interval of the variables to check if any of the variable is equal to zero.
+
+```{R}
 confint(fit3)
+```
+
+
+* None of them is equal to zero.
