@@ -1,0 +1,76 @@
+---
+title: "Data 621 Week 4"
+author: "MUSA T. GANIYU"
+date: "July 5, 2016"
+output: 
+  pdf_document: 
+    keep_tex: yes
+    latex_engine: xelatex
+---
+
+```{r, echo=FALSE}
+options(warn = -1)
+library(MASS);
+library(e1071);
+library(nnet);
+library(stringr)
+library(car)
+library(knitr)
+
+
+insurance <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/insurance_training_data.csv", header = TRUE, sep = ",")
+
+insurance_eva <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/insurance-evaluation-data.csv", header = TRUE, sep = ",")
+
+str(insurance)
+
+
+insurance$INCOME <- as.numeric(gsub("[\\$,]", "", insurance$INCOME))
+insurance$BLUEBOOK <- as.numeric(gsub("[\\$,]", "", insurance$BLUEBOOK))
+insurance$HOME_VAL <- as.numeric(gsub("[\\$,]", "", insurance$HOME_VAL))
+insurance$OLDCLAIM <- as.numeric(gsub("[\\$,]", "", insurance$OLDCLAIM))
+
+
+contrasts(insurance$EDUCATION) = contr.treatment(5)
+contrasts(insurance$JOB) = contr.treatment(9)
+contrasts(insurance$CAR_TYPE) = contr.treatment(6)
+contrasts(insurance$URBANICITY) = contr.treatment(2)
+contrasts(insurance$MSTATUS) = contr.treatment(2)
+contrasts(insurance$SEX) = contr.treatment(2)
+contrasts(insurance$PARENT1) = contr.treatment(2)
+contrasts(insurance$CAR_USE) = contr.treatment(2)
+contrasts(insurance$RED_CAR) = contr.treatment(2)
+contrasts(insurance$REVOKED) = contr.treatment(2)
+```
+
+
+```{r, echo=FALSE}
+
+
+
+
+set.seed(12345)
+#Simulating training and test data sets.
+
+set.seed(123)
+train_ind <- sample(seq_len(nrow(insurance)), size = 6120)
+
+traindat <- insurance[train_ind, ]
+newdat <- insurance[-train_ind, ]
+
+summary(insurance)
+
+sapply(insurance, sd)
+```
+
+
+
+```{r, echo= FALSE}
+checking <- xtabs(~ TARGET_AMT + EDUCATION , data = insurance)
+checking2 <- xtabs(~ TARGET_AMT + CAR_USE , data = insurance)
+
+kable(head(checking, 10))
+
+kable(head(checking2, 10))
+```
+

@@ -1,0 +1,532 @@
+---
+title: "Data 621 Week 4"
+author: "MUSA T. GANIYU"
+date: "July 5, 2016"
+output:
+  html_document: default
+  pdf_document:
+    keep_tex: yes
+    latex_engine: xelatex
+  word_document: default
+---
+
+> **Robust Regression:**
+
+**Robust regression** methods provide an alternative to least squares regression by requiring less restrictive assumptions. Though, the **Residual diagnostics** can help guide you to where the breakdown in assumptions occur, but can be time consuming and sometimes difficult to the untrained eye. Also, the **ordinary least squares** estimates for linear regression are optimal when all of the regression assumptions are valid. When some of these assumptions are invalid, least squares regression can perform poorly.
+
+**DATA EXPLORATION:**
+* The datasets contains 8161 observations and 25 variables (excluding the index).
+
+```{r, echo=FALSE}
+options(warn = -1)
+library(MASS);
+library(e1071);
+library(nnet);
+library(stringr)
+library(car)
+library(knitr)
+library(caTools)
+suppressMessages(library(wle))
+suppressMessages(library(Amelia));
+
+myinsurance <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/insurance_training_data.csv", header = TRUE, sep = ",");
+insurance_eva <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/insurance-evaluation-data.csv", header = TRUE, sep = ",");
+
+str(myinsurance);
+
+missmap(myinsurance, main = "Missing values vs observed");
+
+```
+
+* Boxplot showing the median of the variables, we can see that there are a lot of outliers in the TARGET_AMT Variables.
+
+```{r, echo=FALSE}
+
+boxplot(myinsurance, las = 2, par(mar = c(12, 5, 4, 2) + 0.1));
+
+```
+
+* Summary of the variables.
+
+
+```{r, echo=FALSE}
+
+kable(summary(myinsurance))
+```
+
+From the above plot, we saw that CAR_AGE, YOJ, HOME_VAL, AGE & INCOME all have missing values.
+
+* Standard Deviations.
+
+```{r, echo=FALSE}
+sapply(myinsurance, sd)
+
+```
+
+Plot of TARGET_FLAG against the TARGET_AMT
+
+```{r, echo=FALSE}
+attach(myinsurance)
+
+flag_amount <- glm(TARGET_FLAG ~ TARGET_AMT, family=binomial, data=myinsurance);
+
+plot(TARGET_AMT, TARGET_FLAG, type="n")
+curve(predict(flag_amount, data.frame(TARGET_AMT=x), type="resp"), add = TRUE)
+points(myinsurance$TARGET_AMT, fitted(flag_amount), pch=20);
+
+```
+
+The Plot above depicts a positive coeeficient value for a variable increases the linear regression piece which increases that y equals to 1, increase the probability of a car being in crash or say most of the car were in crash (close to Prob(X=1)) and that the cost amount correlates.
+
+> **DATA PREPARATION:**
+
+*  We will therefore replace the missing values with Zeros for a perfect analysis.
+
+
+```{r, echo=FALSE}
+myinsurance$YOJ[which(is.na(myinsurance$YOJ))] <- 0
+myinsurance$CAR_AGE[which(is.na(myinsurance$CAR_AGE))] <- 0
+myinsurance$HOME_VAL[which(is.na(myinsurance$HOME_VAL))] <- 0
+myinsurance$INCOME[which(is.na(myinsurance$INCOME))] <- 0
+
+insurance_eva$YOJ[which(is.na(insurance_eva$YOJ))] <- 0
+insurance_eva$CAR_AGE[which(is.na(insurance_eva$CAR_AGE))] <- 0
+insurance_eva$HOME_VAL[which(is.na(insurance_eva$HOME_VAL))] <- 0
+insurance_eva$INCOME[which(is.na(insurance_eva$INCOME))] <- 0
+
+```
+
+
+* We saw that some variables have symbols which may not be ideal for a better analysis, we therefore removed such symbols.
+* Some variables are also in categorical forms, we therefore assigned dummy variables.
+
+```{r}
+myinsurance$INCOME <- as.numeric(gsub("[\\$,]", "", myinsurance$INCOME))
+myinsurance$BLUEBOOK <- as.numeric(gsub("[\\$,]", "", myinsurance$BLUEBOOK))
+myinsurance$HOME_VAL <- as.numeric(gsub("[\\$,]", "", myinsurance$HOME_VAL))
+myinsurance$OLDCLAIM <- as.numeric(gsub("[\\$,]", "", myinsurance$OLDCLAIM))
+
+
+insurance_eva$INCOME <- as.numeric(gsub("[\\$,]", "", insurance_eva$INCOME))
+insurance_eva$BLUEBOOK <- as.numeric(gsub("[\\$,]", "", insurance_eva$BLUEBOOK))
+insurance_eva$HOME_VAL <- as.numeric(gsub("[\\$,]", "", insurance_eva$HOME_VAL))
+insurance_eva$OLDCLAIM <- as.numeric(gsub("[\\$,]", "", insurance_eva$OLDCLAIM))
+
+```
+
+
+```{r, echo=FALSE}
+contrasts(myinsurance$EDUCATION) = contr.treatment(5)
+contrasts(myinsurance$JOB) = contr.treatment(9)
+contrasts(myinsurance$CAR_TYPE) = contr.treatment(6)
+contrasts(myinsurance$URBANICITY) = contr.treatment(2)
+contrasts(myinsurance$MSTATUS) = contr.treatment(2)
+contrasts(myinsurance$SEX) = contr.treatment(2)
+contrasts(myinsurance$PARENT1) = contr.treatment(2)
+contrasts(myinsurance$CAR_USE) = contr.treatment(2)
+contrasts(myinsurance$RED_CAR) = contr.treatment(2)
+contrasts(myinsurance$REVOKED) = contr.treatment(2)
+
+
+
+contrasts(insurance_eva$EDUCATION) = contr.treatment(5)
+contrasts(insurance_eva$JOB) = contr.treatment(9)
+contrasts(insurance_eva$CAR_TYPE) = contr.treatment(6)
+contrasts(insurance_eva$URBANICITY) = contr.treatment(2)
+contrasts(insurance_eva$MSTATUS) = contr.treatment(2)
+contrasts(insurance_eva$SEX) = contr.treatment(2)
+contrasts(insurance_eva$PARENT1) = contr.treatment(2)
+contrasts(insurance_eva$CAR_USE) = contr.treatment(2)
+contrasts(insurance_eva$RED_CAR) = contr.treatment(2)
+contrasts(insurance_eva$REVOKED) = contr.treatment(2)
+```
+
+
+
+* Tables showing the interaction between TARGET_AMT with EDUCATION and CAR_USE
+
+```{r, echo= FALSE}
+checking <- xtabs(~ TARGET_AMT + EDUCATION , data = myinsurance)
+checking2 <- xtabs(~ TARGET_AMT + CAR_USE , data = myinsurance)
+
+kable(head(checking, 10))
+
+kable(head(checking2, 10))
+```
+
+* We will now split the datasets into Training (75 percent) and Testing (25 Percent)
+
+```{r, echo=FALSE}
+set.seed(123)
+split_ins <- sample.split(myinsurance$TARGET_FLAG, SplitRatio = 0.75)
+```
+
+* Table depicting verification of the splited datasets
+
+```{r}
+table(split_ins)
+
+6121/(6121+2040)
+```
+
+
+The table below shows that out of the total 2040 oservation in the test, 1502 were not in crash. Which will give room for prediction based on the most frequent outcome for all oservation, and that since no crash is more than crashed, we can deduce that not all cars were flagged for crash.
+
+
+```{r, echo=FALSE}
+
+insurancetrains <- subset(myinsurance, split_ins==TRUE)
+insurancetest <- subset(myinsurance, split_ins==FALSE)
+
+table(insurancetest$TARGET_FLAG)
+
+1502/(1502+538)
+```
+
+**BUILD MODEL:**
+
+We will now do the analysis using General Linear Regression for Logistic Regression.
+```{r, echo= FALSE}
+crashlog <- glm(TARGET_FLAG ~ BLUEBOOK + CAR_AGE + CAR_USE + CLM_FREQ + MSTATUS + OLDCLAIM + TRAVTIME + JOB, data=insurancetrains, family=binomial(link='logit'))
+summary(crashlog)
+```
+
+The Above means, the odds of prediction, if for example here,  since a car flag for crash is represented by 1, which no crash is 0. So, BLUEBOOK coefficient of -2.771e-05, with intercept of -1.038e+00 for crash(1) or no crash(0) is:
+
+* NO CRASH, means the value of a car is most likely makes it NOT involve in a crash is
+
+```{r, echo=FALSE}
+nocrash <- exp(-0.00002771 + (-1.038)*(0))
+nocrash
+```
+
+
+and it probability in percentage is:
+
+```{r, echo=FALSE}
+nocrashProb <- ((0.9999723)/(1 + 0.9999723))*100
+nocrashProb
+```
+
+* CRASH, means the value of a car is most likely makes it involve in a crash is:
+
+```{r, echo=FALSE}
+crash <- exp(-0.00002771 + (-1.038)*(1))
+crash
+```
+
+and it probability in percentage is:
+
+```{r, echo=FALSE}
+crashProb <- ((0.3541525)/(1 + 0.3541525))*100
+crashProb
+```
+
+etc.
+
+* A confirmation of the best model to be selected is to use the confident interval to check for a value of zero(0), i.e the confidence interval of the value that has zero in it range/interval would not be consider as a best model.
+
+```{r, echo=FALSE}
+
+confint(crashlog)
+```
+
+**SELECT MODEL:**
+
+
+From the binary/logit regression model, The best model is: 
+
+${ y=\quad  }\frac { { e }^{ { \beta x\prime  }_{ i } } }{ 1+\quad { e }^{ { \beta x\prime  }_{ i } } }$ 
+
+,\quad where ${\quad x\prime}_{i} \quad$ are\quad 
+
+BLUEBOOK, CAR_AGE, CAR_USE2, CLM_FREQ, MSTATUS2, OLDCLAIM, TRAVTIME, JOB2 and JOB6.
+
+
+
+> #Predictions
+
+
+```{r, echo=FALSE}
+predictCrashlog <- predict(crashlog, type="response")
+summary(predictCrashlog)
+```
+
+Obtaining the CONFUSION MATRIX (CLASSIFICATION MATRIX)
+
+```{r, echo=FALSE}
+
+table(insurancetrains$TARGET_FLAG, predictCrashlog > 0.5)
+```
+
+
+#Sensitivity
+
+```{r, echo=FALSE}
+300/(1315+300)
+```
+
+
+#Specitivity
+
+```{r, echo=FALSE}
+4303/(4303+203)
+
+```
+
+#AUC
+
+
+```{r, echo=FALSE}
+suppressMessages(library(ROCR))
+
+predictionROCR <- prediction(predictCrashlog, insurancetrains$TARGET_FLAG)
+
+crashperformance <- performance(predictionROCR, "tpr", "fpr")
+
+plot(crashperformance, colorize=TRUE)
+
+as.numeric(performance(predictionROCR, "auc")@y.values)
+
+```
+
+
+From the above analysis, we can deduce that the AUC ( Area Under Curve) for all the three models are very close to 1, which indicate that the model is very good and that the true positive is higher than the true negative.
+
+
+```{r, echo=FALSE}
+
+predictCrashlogtest <- predict(crashlog, type="response", newdata = insurancetest)
+summary(predictCrashlogtest)
+
+```
+Above is the summary of predicted value for TARGET_FLAG, using test dataset for its prediction.
+
+
+>**ROBUST REGRESSION:**
+
+As we saw from above analysis using logistics regression, where most of variables are actually significant, we would like to know if theyre in reality? A robust regression should provide alternative to this as it require less restrictive assumptions.
+
+```{r, echo=FALSE}
+
+
+crashlog_robust_hub <- rlm(TARGET_AMT ~ BLUEBOOK + CAR_AGE + CAR_USE + CLM_FREQ + MSTATUS + OLDCLAIM + TRAVTIME + JOB, data=insurancetrains, family=poisson, k2=1.5, scale.est="proposal 2")
+
+summary(crashlog_robust_hub, cor=F)
+```
+
+* prediction from Robust regression using **Huber**
+
+```{r, echo=FALSE}
+predictCrashlog_robust <- predict(crashlog_robust_hub, type="response")
+summary(predictCrashlog_robust);
+
+```
+
+Robust Regression using Tukey
+
+
+```{r, echo=FALSE}
+crashlog_robust_tuk <- rlm(TARGET_AMT ~ BLUEBOOK + CAR_AGE + CAR_USE + CLM_FREQ + MSTATUS + OLDCLAIM + TRAVTIME + JOB, data=insurancetrains, family=poisson, k2=1.5, scale.est="proposal 2" ,psi="psi.bisquare")
+summary(crashlog_robust_tuk, cor=F)
+```
+
+* prediction from Robust regression using **Tukey**
+
+```{r, echo=FALSE}
+predictCrashlog_robust <- predict(crashlog_robust_tuk, type="response")
+summary(predictCrashlog_robust);
+```
+
+* Plot showing similarity and diferent between Huber and **Tukey**
+
+```{r, echo=FALSE}
+weighted_carshlog <- cbind(crashlog_robust_tuk$w, crashlog_robust_hub$W)
+head(weighted_carshlog);
+
+```
+
+
+> **APPENDIX:**
+
+* DATA EXPLORATION:
+
+```{r, eval=FALSE}
+options(warn = -1)
+library(MASS);
+library(e1071);
+library(nnet);
+library(stringr)
+library(car)
+library(knitr)
+library(caTools)
+library(wle)
+suppressMessages(library(Amelia));
+
+myinsurance <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/insurance_training_data.csv", header = TRUE, sep = ",");
+insurance_eva <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/insurance-evaluation-data.csv", header = TRUE, sep = ",");
+
+str(myinsurance);
+
+missmap(myinsurance, main = "Missing values vs observed");
+
+boxplot(myinsurance, las = 2, par(mar = c(12, 5, 4, 2) + 0.1));
+
+kable(summary(myinsurance))
+
+sapply(myinsurance, sd)
+
+attach(myinsurance)
+
+flag_amount <- glm(TARGET_FLAG ~ TARGET_AMT, family=binomial, data=myinsurance);
+
+plot(TARGET_AMT, TARGET_FLAG, type="n")
+curve(predict(flag_amount, data.frame(TARGET_AMT=x), type="resp"), add = TRUE)
+points(myinsurance$TARGET_AMT, fitted(flag_amount), pch=20);
+
+```
+
+> **DATA PREPARATION:**
+
+```{r, eval=FALSE}
+myinsurance$YOJ[which(is.na(myinsurance$YOJ))] <- 0
+myinsurance$CAR_AGE[which(is.na(myinsurance$CAR_AGE))] <- 0
+myinsurance$HOME_VAL[which(is.na(myinsurance$HOME_VAL))] <- 0
+myinsurance$INCOME[which(is.na(myinsurance$INCOME))] <- 0
+
+insurance_eva$YOJ[which(is.na(insurance_eva$YOJ))] <- 0
+insurance_eva$CAR_AGE[which(is.na(insurance_eva$CAR_AGE))] <- 0
+insurance_eva$HOME_VAL[which(is.na(insurance_eva$HOME_VAL))] <- 0
+insurance_eva$INCOME[which(is.na(insurance_eva$INCOME))] <- 0
+
+
+myinsurance$INCOME <- as.numeric(gsub("[\\$,]", "", myinsurance$INCOME))
+myinsurance$BLUEBOOK <- as.numeric(gsub("[\\$,]", "", myinsurance$BLUEBOOK))
+myinsurance$HOME_VAL <- as.numeric(gsub("[\\$,]", "", myinsurance$HOME_VAL))
+myinsurance$OLDCLAIM <- as.numeric(gsub("[\\$,]", "", myinsurance$OLDCLAIM))
+
+
+insurance_eva$INCOME <- as.numeric(gsub("[\\$,]", "", insurance_eva$INCOME))
+insurance_eva$BLUEBOOK <- as.numeric(gsub("[\\$,]", "", insurance_eva$BLUEBOOK))
+insurance_eva$HOME_VAL <- as.numeric(gsub("[\\$,]", "", insurance_eva$HOME_VAL))
+insurance_eva$OLDCLAIM <- as.numeric(gsub("[\\$,]", "", insurance_eva$OLDCLAIM))
+
+
+contrasts(myinsurance$EDUCATION) = contr.treatment(5)
+contrasts(myinsurance$JOB) = contr.treatment(9)
+contrasts(myinsurance$CAR_TYPE) = contr.treatment(6)
+contrasts(myinsurance$URBANICITY) = contr.treatment(2)
+contrasts(myinsurance$MSTATUS) = contr.treatment(2)
+contrasts(myinsurance$SEX) = contr.treatment(2)
+contrasts(myinsurance$PARENT1) = contr.treatment(2)
+contrasts(myinsurance$CAR_USE) = contr.treatment(2)
+contrasts(myinsurance$RED_CAR) = contr.treatment(2)
+contrasts(myinsurance$REVOKED) = contr.treatment(2)
+
+
+
+contrasts(insurance_eva$EDUCATION) = contr.treatment(5)
+contrasts(insurance_eva$JOB) = contr.treatment(9)
+contrasts(insurance_eva$CAR_TYPE) = contr.treatment(6)
+contrasts(insurance_eva$URBANICITY) = contr.treatment(2)
+contrasts(insurance_eva$MSTATUS) = contr.treatment(2)
+contrasts(insurance_eva$SEX) = contr.treatment(2)
+contrasts(insurance_eva$PARENT1) = contr.treatment(2)
+contrasts(insurance_eva$CAR_USE) = contr.treatment(2)
+contrasts(insurance_eva$RED_CAR) = contr.treatment(2)
+contrasts(insurance_eva$REVOKED) = contr.treatment(2)
+
+checking <- xtabs(~ TARGET_AMT + EDUCATION , data = myinsurance)
+checking2 <- xtabs(~ TARGET_AMT + CAR_USE , data = myinsurance)
+
+kable(head(checking, 10))
+
+kable(head(checking2, 10))
+
+set.seed(123)
+split_ins <- sample.split(myinsurance$TARGET_FLAG, SplitRatio = 0.75)
+
+table(split_ins)
+
+6121/(6121+2040)
+
+
+insurancetrains <- subset(myinsurance, split_ins==TRUE)
+insurancetest <- subset(myinsurance, split_ins==FALSE)
+
+table(insurancetest$TARGET_FLAG)
+
+1502/(1502+538)
+```
+
+> * **BUILD MODEL:**
+
+
+```{r, eval= FALSE}
+crashlog <- glm(TARGET_FLAG ~ BLUEBOOK + CAR_AGE + CAR_USE + CLM_FREQ + MSTATUS + OLDCLAIM + TRAVTIME + JOB, data=insurancetrains, family=binomial(link='logit'))
+summary(crashlog)
+
+nocrash <- exp(-0.00002771 + (-1.038)*(0))
+nocrash
+
+nocrashProb <- ((0.9999723)/(1 + 0.9999723))*100
+nocrashProb
+
+crash <- exp(-0.00002771 + (-1.038)*(1))
+crash
+
+crashProb <- ((0.3541525)/(1 + 0.3541525))*100
+crashProb
+
+confint(crashlog)
+```
+
+
+> * **SELECT MODEL:**
+
+
+```{r, eval=FALSE}
+predictCrashlog <- predict(crashlog, type="response")
+summary(predictCrashlog)
+
+table(insurancetrains$TARGET_FLAG, predictCrashlog > 0.5)
+
+300/(1315+300)
+
+4303/(4303+203)
+
+
+suppressMessages(library(ROCR))
+
+predictionROCR <- prediction(predictCrashlog, insurancetrains$TARGET_FLAG)
+
+crashperformance <- performance(predictionROCR, "tpr", "fpr")
+
+plot(crashperformance, colorize=TRUE)
+
+as.numeric(performance(predictionROCR, "auc")@y.values)
+
+
+
+predictCrashlogtest <- predict(crashlog, type="response", newdata = insurancetest)
+summary(predictCrashlogtest)
+
+
+
+crashlog_robust_hub <- rlm(TARGET_AMT ~ BLUEBOOK + CAR_AGE + CAR_USE + CLM_FREQ + MSTATUS + OLDCLAIM + TRAVTIME + JOB, data=insurancetrains, family=poisson, k2=1.5, scale.est="proposal 2")
+
+summary(crashlog_robust_hub, cor=F)
+
+predictCrashlog_robust <- predict(crashlog_robust_hub, type="response")
+summary(predictCrashlog_robust);
+
+crashlog_robust_tuk <- rlm(TARGET_AMT ~ BLUEBOOK + CAR_AGE + CAR_USE + CLM_FREQ + MSTATUS + OLDCLAIM + TRAVTIME + JOB, data=insurancetrains, family=poisson, k2=1.5, scale.est="proposal 2" ,psi="psi.bisquare")
+summary(crashlog_robust_tuk, cor=F)
+
+predictCrashlog_robust <- predict(crashlog_robust_tuk, type="response")
+summary(predictCrashlog_robust);
+
+weighted_carshlog <- cbind(crashlog_robust_tuk$w, crashlog_robust_hub$W)
+head(weighted_carshlog);
+
+```

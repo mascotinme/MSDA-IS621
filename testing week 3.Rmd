@@ -1,0 +1,366 @@
+---
+title: "DATA621_Proj3"
+author: "sanjivek"
+date: "July 2, 2016"
+output: html_document
+---
+
+---
+title: "Data 621 Week Update"
+author: "MUSA T. GANIYU"
+date: "July 2, 2016"
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+  pdf_document: default
+  tidy: yes
+  word_document: default
+code_folding: hide
+---
+
+
+
+```{r setup, include=FALSE}
+
+options(warn = -1)
+
+suppressMessages(require(plotly))
+library(knitr)
+suppressMessages(library(RCurl))
+suppressMessages(library(plyr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(plotly))
+suppressMessages(require(scatterplot3d))
+suppressMessages(library(Amelia))
+suppressMessages(library(ROCR))
+suppressMessages(library(pROC))
+suppressMessages(library(corrplot));
+
+crime <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/crime-training-data.csv", header = TRUE, sep = ",")
+
+crime_evaluation <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/crime-evaluation-data.csv", header = TRUE, sep = ",")
+
+
+```
+
+## Data Exploration:
+
+Analyzing the overall data to see if there is any discrepancies there as missing data or there is any need for data transformation
+
+**Inferential Statistics**
+
+```{R}
+names(crime)
+str(crime)
+dim(crime)
+kable(summary(crime))
+missmap(crime, main = "Missing values vs observed")
+
+```
+
+### We observed that:
+
+* The crime dataset contains 14 variables, with 466 observations
+
+* There are no missing values.
+
+* The Minimum, Quatiles and Maximum values.
+
+* Since this is logistic regression we don't have to worry about the normal distribution of data and no transformation is needed
+
+
+## Data Preparation
+
+
+### For this there is no major data preparation effort is needed as this is a logistic regression and more over there is no missing data in the dataset, so we will try doing a preliminary analysis as plotting LSTAT against Zn
+```{R}
+# Why We have done this??
+
+plot_ly(data = crime, x = zn , y = lstat, mode = "markers",
+        color = "blue", line = list(shape = "linear"))
+```
+
+## Build Models
+### Consdering target as a response variable (Independent variable), lets pair it with complete data set and also find the best fit model using GLM package
+
+```{R}
+pairs(crime, col=crime$target)
+
+fit <- glm(target ~., data = crime) 
+```
+
+### Summary of the output is as shown below
+
+```{R}
+
+summary(fit)
+par(mfrow=c(2,2))
+plot(fit)
+```
+
+### Conclusion:
+Simple regression model using glm package shows that the p value for zn,indus,chas, rm,dis, tax, ptratio,black ,lstat are more than the significance value of 0.05, so they are not contributing much to the target (independent variable)
+
+So, lets move to the logistic regression for binomial distribution where we can see the variables interdependent on the independent variable target and get teh best fit subset of the crime dataset
+
+### Using Logistics regression for a better results as
+
+```{R}
+
+crimetarget <- glm(target~., family=binomial(link='logit'),data=crime)
+
+
+summary(crimetarget)
+par(mfrow=c(2,2))
+plot(crimetarget)
+
+```
+
+### Conclusion:
+We found that variables like zn, indus, chas,rm and lstat are not statistically significant due to their p-value being greater than statiscally accepted p-value of 0.05, So we have a scope to refine the model without these variables and repeat the best fit logistic regression and build a preditive model.
+
+
+**Interpretations:**
+
+Note that the Null **deviance** is 645.88, which implies that if all other parameters are held constant(control or not included), the estimate would be 645.88, while the Residual deviance of 186.15 means with the imclusion of other estimator, we expect the deviance to be 186.14. Also we should be talking about AIC which is 214,15 and signifies the best fit quality of the model compared to other similar model available. If we are comparing with other models, best model should have lowest deviance and AIC value.
+
+So lets move forward with cleaning up the crime dataset with those variable which are not contributing to the target variable and arrive to the next best fit model.
+
+*NB: The greater the difference between the Null deviance and Residual deviance, the better.
+
+Lets confirm this by running the Analysis of Variance (ANOVA) on crimetarget dataset to confirm if we have concluded the significance of varaibles correctly or not.
+
+```{R}
+
+anova(crimetarget, test="Chisq")
+```
+
+### Conclusion:
+The Analysis of Variance tells a different story, it shows that the chas, age and lstat has no significance and rest all are contributing towards target variable. So lets run the best fit model keeping significant variables.
+
+
+```{r}
+crime2 <- subset(crime, select = -c(zn,indus,chas,rm,lstat))
+
+crimetarget2 <- glm(target~., family=binomial(link='logit'),data=crime2)
+summary(crimetarget2)
+par(mfrow=c(2,2))
+plot(crimetarget2)
+
+anova(crimetarget2, test="Chisq")
+
+
+```
+
+##Conclusion:
+age, dis are not significantly contributing to the target variable as it's p value is more than the significance value, so lets remove that from the next iteration 
+
+```{r}
+crime3 <- subset(crime2, select = -c(age, dis))
+
+crimetarget3 <- glm(target~., family=binomial(link='logit'),data=crime3)
+summary(crimetarget3)
+par(mfrow=c(2,2))
+plot(crimetarget3)
+
+anova(crimetarget3, test="Chisq")
+
+
+```
+
+### Conclusion:
+crimetarget3 model has nox,black, rad, tax, ptratio and medv as the significant variables and contrbuting to the target as key variable predicting crime in that area
+
+
+
+## Predictive model for crimetarget model
+```{R}
+
+pred <- predict(crimetarget, type="response")
+pred2 <- prediction(pred, crime$target)
+pred3 <- performance(pred2, measure = "tpr", x.measure = "fpr")
+plot(pred3)
+```
+
+Above is the plot for Sensitivity and Specitivity for the city target, while the value below is it AUC.
+
+```{R}
+auc <- performance(pred2, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+> Predictions and Accuracy for crimetarget model
+
+```{R}
+
+
+target_predicts <- predict(crimetarget,newdata=subset(crime,select=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14)),type='response')
+target_predicts <- ifelse(target_predicts > 0.5,1,0)
+
+attach(crime)
+
+CM1<-table(target_predicts, target)
+Pos_Pos=CM1[1,1]
+Pos_Neg=CM1[1,2]
+Neg_Pos=CM1[2,1]
+Neg_Neg=CM1[2,2]
+
+Specificity= Neg_Neg/(Pos_Neg+Neg_Neg)
+Sensitivity= Pos_Pos/(Pos_Pos+Neg_Pos)
+Pos_Pred_Val= Pos_Pos/(Pos_Pos+Pos_Neg)
+Neg_Pred_Val=Neg_Neg/(Neg_Pos+Neg_Neg)
+
+misClasificError <- mean(target_predicts != target)
+Accuracy=1-misClasificError
+
+print(paste('Accuracy',1-misClasificError))
+
+BestFitModel1<- data.frame(auc,Specificity,Sensitivity,Accuracy,Pos_Pred_Val,Neg_Pred_Val)
+
+```
+
+```{r}
+M <- cor(crime)
+corrplot(M, method="number")
+```
+
+
+## Predictive model for crimetarget2 model
+
+```{R}
+
+pred <- predict(crimetarget2, type="response")
+pred2 <- prediction(pred, crime$target)
+pred3 <- performance(pred2, measure = "tpr", x.measure = "fpr")
+plot(pred3)
+```
+
+Above is the plot for Sensitivity and Specitivity for the city target, while the value below is it AUC.
+
+```{R}
+auc <- performance(pred2, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+> Predictions and Accuracy for crimetarget2 model
+
+```{R}
+
+
+target_predicts <- predict(crimetarget2,newdata=crime,type='response')
+target_predicts <- ifelse(target_predicts > 0.5,1,0)
+
+attach(crime)
+
+CM1<-table(target_predicts, target)
+Pos_Pos=CM1[1,1]
+Pos_Neg=CM1[1,2]
+Neg_Pos=CM1[2,1]
+Neg_Neg=CM1[2,2]
+
+Specificity= Neg_Neg/(Pos_Neg+Neg_Neg)
+Sensitivity= Pos_Pos/(Pos_Pos+Neg_Pos)
+Pos_Pred_Val= Pos_Pos/(Pos_Pos+Pos_Neg)
+Neg_Pred_Val=Neg_Neg/(Neg_Pos+Neg_Neg)
+
+misClasificError <- mean(target_predicts != target)
+Accuracy=1-misClasificError
+
+print(paste('Accuracy',1-misClasificError))
+
+BestFitModel2<- data.frame(auc,Specificity,Sensitivity,Accuracy,Pos_Pred_Val,Neg_Pred_Val)
+
+```
+
+
+```{r}
+M <- cor(crime2)
+corrplot(M, method="number")
+```
+
+## Predictive model for crimetarget3 model
+```{R}
+
+pred <- predict(crimetarget3, type="response")
+pred2 <- prediction(pred, crime$target)
+pred3 <- performance(pred2, measure = "tpr", x.measure = "fpr")
+plot(pred3)
+```
+
+Above is the plot for Sensitivity and Specitivity for the city target, while the value below is it AUC.
+
+```{R}
+auc <- performance(pred2, measure = "auc")
+auc <- auc@y.values[[1]]
+auc
+```
+
+
+> Predictions and Accuracy.
+
+```{R}
+
+
+target_predicts <- predict(crimetarget3,newdata=crime,type='response')
+target_predicts <- ifelse(target_predicts > 0.5,1,0)
+
+attach(crime)
+
+CM1<-table(target_predicts, target)
+Pos_Pos=CM1[1,1]
+Pos_Neg=CM1[1,2]
+Neg_Pos=CM1[2,1]
+Neg_Neg=CM1[2,2]
+
+Specificity= Neg_Neg/(Pos_Neg+Neg_Neg)
+Sensitivity= Pos_Pos/(Pos_Pos+Neg_Pos)
+Pos_Pred_Val= Pos_Pos/(Pos_Pos+Pos_Neg)
+Neg_Pred_Val=Neg_Neg/(Neg_Pos+Neg_Neg)
+
+misClasificError <- mean(target_predicts != target)
+Accuracy=1-misClasificError
+
+print(paste('Accuracy',1-misClasificError))
+
+BestFitModel3<- data.frame(auc,Specificity,Sensitivity,Accuracy,Pos_Pred_Val,Neg_Pred_Val)
+```
+
+```{r}
+M <- cor(crime3)
+corrplot(M, method="number")
+```
+
+##Compare the Models to choose the best
+
+```{r}
+
+CompareBestFitModel=rbind(BestFitModel1,BestFitModel2,BestFitModel3)
+colnames(CompareBestFitModel)=c("AUC","Specificity","Sensitivity","Accuracy","Pos_Pred_Val","Neg_Pred_Val")
+rownames(CompareBestFitModel)=c("Model1","Model2","Model3")
+CompareBestFitModel
+
+```
+
+**Conclusion:**
+
+
+From the genaral logit regression model,  
+
+${ y=\quad  }\frac { { e }^{ { \beta x\prime  }_{ i } } }{ 1+\quad { e }^{ { \beta x\prime  }_{ i } } }$ 
+
+,\quad where ${\quad x\prime}_{i} \quad$ are\quad 
+
+nox, rad, tax, pratio, black, medv.
+
+
+From the above analysis, we can deduce that the AUC ( Area Under Curve) for all the three models are very close to 1, which indicate that the model is very good and that the true positive is higher than the true negative.
+
+
+**Recommendation**
+
+We therefore recommend that, the nox, rad, tax, pratio, black and medv contributed significantly to the increasing crime rate of the city under observation.

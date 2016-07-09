@@ -1,0 +1,232 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+  \newcommand{\euro}{€}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\PassOptionsToPackage{usenames,dvipsnames}{color} % color is loaded by hyperref
+\hypersetup{unicode=true,
+            pdftitle={Data 621 Week 4},
+            pdfauthor={MUSA T. GANIYU},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{longtable,booktabs}
+\usepackage{graphicx,grffile}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+
+%%% Use protect on footnotes to avoid problems with footnotes in titles
+\let\rmarkdownfootnote\footnote%
+\def\footnote{\protect\rmarkdownfootnote}
+
+%%% Change title format to be more compact
+\usepackage{titling}
+
+% Create subtitle command for use in maketitle
+\newcommand{\subtitle}[1]{
+  \posttitle{
+    \begin{center}\large#1\end{center}
+    }
+}
+
+\setlength{\droptitle}{-2em}
+  \title{Data 621 Week 4}
+  \pretitle{\vspace{\droptitle}\centering\huge}
+  \posttitle{\par}
+  \author{MUSA T. GANIYU}
+  \preauthor{\centering\large\emph}
+  \postauthor{\par}
+  \predate{\centering\large\emph}
+  \postdate{\par}
+  \date{July 5, 2016}
+
+
+
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+\begin{document}
+\maketitle
+
+\begin{verbatim}
+## 'data.frame':    8161 obs. of  26 variables:
+##  $ INDEX      : int  1 2 4 5 6 7 8 11 12 13 ...
+##  $ TARGET_FLAG: int  0 0 0 0 0 1 0 1 1 0 ...
+##  $ TARGET_AMT : num  0 0 0 0 0 ...
+##  $ KIDSDRIV   : int  0 0 0 0 0 0 0 1 0 0 ...
+##  $ AGE        : int  60 43 35 51 50 34 54 37 34 50 ...
+##  $ HOMEKIDS   : int  0 0 1 0 0 1 0 2 0 0 ...
+##  $ YOJ        : int  11 11 10 14 NA 12 NA NA 10 7 ...
+##  $ INCOME     : Factor w/ 6613 levels "","$0 ","$1,007 ",..: 5033 6292 1250 1 509 746 1488 315 4765 282 ...
+##  $ PARENT1    : Factor w/ 2 levels "No","Yes": 1 1 1 1 1 2 1 1 1 1 ...
+##  $ HOME_VAL   : Factor w/ 5107 levels "","$0 ","$100,093 ",..: 2 3259 348 3917 3034 2 1 4167 2 2 ...
+##  $ MSTATUS    : Factor w/ 2 levels "Yes","z_No": 2 2 1 1 1 2 1 1 2 2 ...
+##  $ SEX        : Factor w/ 2 levels "M","z_F": 1 1 2 1 2 2 2 1 2 1 ...
+##  $ EDUCATION  : Factor w/ 5 levels "<High School",..: 4 5 5 1 4 2 1 2 2 2 ...
+##  $ JOB        : Factor w/ 9 levels "","Clerical",..: 7 9 2 9 3 9 9 9 2 7 ...
+##  $ TRAVTIME   : int  14 22 5 32 36 46 33 44 34 48 ...
+##  $ CAR_USE    : Factor w/ 2 levels "Commercial","Private": 2 1 2 2 2 1 2 1 2 1 ...
+##  $ BLUEBOOK   : Factor w/ 2789 levels "$1,500 ","$1,520 ",..: 434 503 2212 553 802 746 2672 701 135 852 ...
+##  $ TIF        : int  11 1 4 7 1 1 1 1 1 7 ...
+##  $ CAR_TYPE   : Factor w/ 6 levels "Minivan","Panel Truck",..: 1 1 6 1 6 4 6 5 6 5 ...
+##  $ RED_CAR    : Factor w/ 2 levels "no","yes": 2 2 1 2 1 1 1 2 1 1 ...
+##  $ OLDCLAIM   : Factor w/ 2857 levels "$0 ","$1,000 ",..: 1449 1 1311 1 432 1 1 510 1 1 ...
+##  $ CLM_FREQ   : int  2 0 2 0 2 0 0 1 0 0 ...
+##  $ REVOKED    : Factor w/ 2 levels "No","Yes": 1 1 1 1 2 1 1 2 1 1 ...
+##  $ MVR_PTS    : int  3 0 3 0 3 0 0 10 0 1 ...
+##  $ CAR_AGE    : int  18 1 10 6 17 7 1 7 1 17 ...
+##  $ URBANICITY : Factor w/ 2 levels "Highly Urban/ Urban",..: 1 1 1 1 1 1 1 1 1 2 ...
+\end{verbatim}
+
+\begin{verbatim}
+##      INDEX        TARGET_FLAG       TARGET_AMT        KIDSDRIV     
+##  Min.   :    1   Min.   :0.0000   Min.   :     0   Min.   :0.0000  
+##  1st Qu.: 2559   1st Qu.:0.0000   1st Qu.:     0   1st Qu.:0.0000  
+##  Median : 5133   Median :0.0000   Median :     0   Median :0.0000  
+##  Mean   : 5152   Mean   :0.2638   Mean   :  1504   Mean   :0.1711  
+##  3rd Qu.: 7745   3rd Qu.:1.0000   3rd Qu.:  1036   3rd Qu.:0.0000  
+##  Max.   :10302   Max.   :1.0000   Max.   :107586   Max.   :4.0000  
+##                                                                    
+##       AGE           HOMEKIDS           YOJ           INCOME      
+##  Min.   :16.00   Min.   :0.0000   Min.   : 0.0   Min.   :     0  
+##  1st Qu.:39.00   1st Qu.:0.0000   1st Qu.: 9.0   1st Qu.: 28097  
+##  Median :45.00   Median :0.0000   Median :11.0   Median : 54028  
+##  Mean   :44.79   Mean   :0.7212   Mean   :10.5   Mean   : 61898  
+##  3rd Qu.:51.00   3rd Qu.:1.0000   3rd Qu.:13.0   3rd Qu.: 85986  
+##  Max.   :81.00   Max.   :5.0000   Max.   :23.0   Max.   :367030  
+##  NA's   :6                        NA's   :454    NA's   :445     
+##  PARENT1       HOME_VAL      MSTATUS      SEX               EDUCATION   
+##  No :7084   Min.   :     0   Yes :4894   M  :3786   <High School :1203  
+##  Yes:1077   1st Qu.:     0   z_No:3267   z_F:4375   Bachelors    :2242  
+##             Median :161160                          Masters      :1658  
+##             Mean   :154867                          PhD          : 728  
+##             3rd Qu.:238724                          z_High School:2330  
+##             Max.   :885282                                              
+##             NA's   :464                                                 
+##             JOB          TRAVTIME            CAR_USE        BLUEBOOK    
+##  z_Blue Collar:1825   Min.   :  5.00   Commercial:3029   Min.   : 1500  
+##  Clerical     :1271   1st Qu.: 22.00   Private   :5132   1st Qu.: 9280  
+##  Professional :1117   Median : 33.00                     Median :14440  
+##  Manager      : 988   Mean   : 33.49                     Mean   :15710  
+##  Lawyer       : 835   3rd Qu.: 44.00                     3rd Qu.:20850  
+##  Student      : 712   Max.   :142.00                     Max.   :69740  
+##  (Other)      :1413                                                     
+##       TIF                CAR_TYPE    RED_CAR       OLDCLAIM    
+##  Min.   : 1.000   Minivan    :2145   no :5783   Min.   :    0  
+##  1st Qu.: 1.000   Panel Truck: 676   yes:2378   1st Qu.:    0  
+##  Median : 4.000   Pickup     :1389              Median :    0  
+##  Mean   : 5.351   Sports Car : 907              Mean   : 4037  
+##  3rd Qu.: 7.000   Van        : 750              3rd Qu.: 4636  
+##  Max.   :25.000   z_SUV      :2294              Max.   :57037  
+##                                                                
+##     CLM_FREQ      REVOKED       MVR_PTS          CAR_AGE      
+##  Min.   :0.0000   No :7161   Min.   : 0.000   Min.   :-3.000  
+##  1st Qu.:0.0000   Yes:1000   1st Qu.: 0.000   1st Qu.: 1.000  
+##  Median :0.0000              Median : 1.000   Median : 8.000  
+##  Mean   :0.7986              Mean   : 1.696   Mean   : 8.328  
+##  3rd Qu.:2.0000              3rd Qu.: 3.000   3rd Qu.:12.000  
+##  Max.   :5.0000              Max.   :13.000   Max.   :28.000  
+##                                               NA's   :510     
+##                  URBANICITY  
+##  Highly Urban/ Urban  :6492  
+##  z_Highly Rural/ Rural:1669  
+##                              
+##                              
+##                              
+##                              
+## 
+\end{verbatim}
+
+\begin{verbatim}
+##        INDEX  TARGET_FLAG   TARGET_AMT     KIDSDRIV          AGE 
+## 2978.8939616    0.4407276 4704.0269299    0.5115341           NA 
+##     HOMEKIDS          YOJ       INCOME      PARENT1     HOME_VAL 
+##    1.1163233           NA           NA    0.3384779           NA 
+##      MSTATUS          SEX    EDUCATION          JOB     TRAVTIME 
+##    0.4899929    0.4987266    1.4448565    2.6818733   15.9083334 
+##      CAR_USE     BLUEBOOK          TIF     CAR_TYPE      RED_CAR 
+##    0.4831436 8419.7340755    4.1466353    1.9653570    0.4544287 
+##     OLDCLAIM     CLM_FREQ      REVOKED      MVR_PTS      CAR_AGE 
+## 8777.1391044    1.1584527    0.3279216    2.1471117           NA 
+##   URBANICITY 
+##    0.4033673
+\end{verbatim}
+
+\begin{longtable}[c]{@{}lrrrrr@{}}
+\toprule
+& \textless{}High School & Bachelors & Masters & PhD & z\_High
+School\tabularnewline
+\midrule
+\endhead
+0 & 818 & 1719 & 1331 & 603 & 1537\tabularnewline
+30.27728015 & 0 & 0 & 0 & 0 & 1\tabularnewline
+58.53106231 & 1 & 0 & 0 & 0 & 0\tabularnewline
+95.56731717 & 0 & 0 & 0 & 0 & 1\tabularnewline
+108.7414986 & 0 & 0 & 0 & 0 & 1\tabularnewline
+159.1509202 & 0 & 0 & 0 & 0 & 1\tabularnewline
+196.1468185 & 0 & 0 & 0 & 0 & 1\tabularnewline
+223.6120015 & 0 & 0 & 0 & 0 & 1\tabularnewline
+262.0385439 & 0 & 0 & 0 & 0 & 1\tabularnewline
+291.7285708 & 0 & 0 & 1 & 0 & 0\tabularnewline
+\bottomrule
+\end{longtable}
+
+\begin{longtable}[c]{@{}lrr@{}}
+\toprule
+& Commercial & Private\tabularnewline
+\midrule
+\endhead
+0 & 1982 & 4026\tabularnewline
+30.27728015 & 1 & 0\tabularnewline
+58.53106231 & 0 & 1\tabularnewline
+95.56731717 & 1 & 0\tabularnewline
+108.7414986 & 1 & 0\tabularnewline
+159.1509202 & 1 & 0\tabularnewline
+196.1468185 & 1 & 0\tabularnewline
+223.6120015 & 1 & 0\tabularnewline
+262.0385439 & 0 & 1\tabularnewline
+291.7285708 & 0 & 1\tabularnewline
+\bottomrule
+\end{longtable}
+
+\end{document}
