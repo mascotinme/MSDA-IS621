@@ -1,0 +1,563 @@
+---
+title: 'DATA 621: WEEK 5 ASSIGNMENT'
+author: "MUSA T. GANIYU"
+date: "July 13, 2016"
+output: html_document
+---
+
+A wine dataset that contains 12795 observations with 14 variables (Excluding the Index):
+
+```{r, echo=FALSE}
+options(warn = -1)
+library(MASS);
+library(e1071);
+library(nnet);
+library(knitr);
+library(caTools);
+library(psych)
+suppressMessages(library(ggplot2))
+suppressMessages(library(Amelia));
+suppressMessages(library(mlogit));
+suppressMessages(library(VIM));
+
+winedata <- read.csv ("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/wine-training-data.csv", sep = ",", header = TRUE)
+
+wine_eval <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/wine-evaluation-data.csv", sep = ",", header = TRUE)
+
+```
+
+> **DATA EXPLORATION:**
+
+
+* DESCRIPTIVE STATISTICS
+
+A boxplot showing the mean, median and IQR of the variables with ResidualSUgar, FreeSulphurDioxide and TotalSulphurdioxide having the most outliers 
+
+```{r, echo=FALSE}
+
+
+winedata <- subset(winedata, select= -ï..INDEX)
+
+boxplot(winedata, las = 2, par(mar = c(12, 5, 4, 2) + 0.1));
+```
+
+A more robust descriptive statistics
+
+```{r, echo=FALSE}
+freq <- describe(winedata);
+kable(freq)
+```
+
+Side-by-side depiction of means and their repective variances shows Overdispersion.
+
+```{r, echo=FALSE}
+mean_var <- cbind.data.frame(names(winedata), freq$mean, freq$sd^2)
+kable(mean_var)
+```
+
+Checking for missing values
+
+```{r, echo=FALSE}
+histplot <- aggr(winedata, col=c('green','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+
+A confirmation from the above and below shows that STARS, Sulphates, TotalSulphurDioxide, Alcohol, FreeSulphurDioxide, Chloride, ResidualSugar and pH all have missing values
+
+```{r, echo=FALSE}
+missmap(winedata, main = "Missing values vs observed");
+```
+
+> A table describing the respective no of observation in the STARS variable.
+
+```{r, echo=FALSE}
+suppressMessages(attach(winedata))
+table(STARS)
+```
+
+> **DATA PREPARATION:**
+
+**Issues Found:**
+
+From the data exploration above, we can deduce that many of the variable do have missing values, and some data format are incorrect.
+
+**Solution:**
+
+* The missing values would be replaced with zero(0).
+
+* The incorrrect format be corrected,e.g from Int to Factor.
+
+* Re-categorized into a better level format usable in R.
+
+```{r, echo=FALSE}
+winedata$STARS <- factor(winedata$STARS);
+winedata$LabelAppeal <- factor(winedata$LabelAppeal);
+
+winedata$STARS[which(is.na(winedata$STARS))] <- 0
+winedata$Sulphates[which(is.na(winedata$Sulphates))] <- 0;
+winedata$TotalSulfurDioxide[which(is.na(winedata$TotalSulfurDioxide))] <- 0;
+winedata$Alcohol[which(is.na(winedata$Alcohol))] <- 0;
+winedata$FreeSulfurDioxide[which(is.na(winedata$FreeSulfurDioxide))] <- 0;
+winedata$Chlorides[which(is.na(winedata$Chlorides))] <- 0;
+winedata$ResidualSugar[which(is.na(winedata$ResidualSugar))] <- 0;
+winedata$pH[which(is.na(winedata$pH))] <- 0;
+
+
+winedata$STARS <- factor(winedata$STARS);
+winedata$LabelAppeal <- factor(winedata$LabelAppeal);
+
+
+
+wine_eval$STARS[which(is.na(wine_eval$STARS))] <- 0
+wine_eval$Sulphates[which(is.na(wine_eval$Sulphates))] <- 0;
+wine_eval$TotalSulfurDioxide[which(is.na(wine_eval$TotalSulfurDioxide))] <- 0;
+wine_eval$Alcohol[which(is.na(wine_eval$Alcohol))] <- 0;
+wine_eval$FreeSulfurDioxide[which(is.na(wine_eval$FreeSulfurDioxide))] <- 0;
+wine_eval$Chlorides[which(is.na(wine_eval$Chlorides))] <- 0;
+wine_eval$ResidualSugar[which(is.na(wine_eval$ResidualSugar))] <- 0;
+wine_eval$pH[which(is.na(wine_eval$pH))] <- 0;
+wine_eval$AcidIndex[which(is.na(wine_eval$AcidIndex))] <- 0
+wine_eval$LabelAppeal[which(is.na(wine_eval$LabelAppeal))] <- 0;
+wine_eval$Density[which(is.na(wine_eval$Density))] <- 0;
+wine_eval$CitricAcid[which(is.na(wine_eval$CitricAcid ))] <- 0;
+wine_eval$VolatileAcidity[which(is.na(wine_eval$VolatileAcidity))] <- 0;
+wine_eval$FixedAcidity[which(is.na(wine_eval$FixedAcidity))] <- 0;
+
+wine_eval$STARS <- factor(wine_eval$STARS);
+wine_eval$LabelAppeal <- factor(wine_eval$LabelAppeal);
+contrasts(wine_eval$STARS) = contr.treatment(5)
+contrasts(wine_eval$LabelAppeal) = contr.treatment(5)
+```
+
+Solution Cont'd
+
+* The IN and TARGET variables in the evaluation dataset in irrelevant, we will therefore exclude it from analysis.
+ 
+```{r, echo=FALSE}
+
+
+wine_data <- subset(wine_eval, select=c(-TARGET, -IN))
+
+checking <- xtabs(~  LabelAppeal + STARS , data = winedata);
+
+kable(head(checking, 10));
+
+
+# density and stars
+```
+
+Interpretation:  A -2(LabelAppeal) is a score for a customer dislike for design, also a 4(STARS) means the wine is excellent. For example, a customer that dislikes the wine by a score of -2 didnt give a 4 (excellent) to the wine, but 21 of them gave 3 to the wine, even though they dislike it.
+
+* We will now split the datasets into Training (75 percent) and Testing (25 Percent)
+
+```{r, echo=FALSE}
+set.seed(123)
+split_ins <- sample.split(winedata$TARGET, SplitRatio = 0.75)
+table(split_ins)
+
+9595/(3200+9595)
+
+winetrains <- subset(winedata, split_ins==TRUE)
+winetest <- subset(winedata, split_ins==FALSE)
+
+#stepwise <- step(fit1, direction = "both")
+```
+
+> **BUILD MODELS:**
+
+We will now reshape the data from Wide to Long format, and obtain their respective descriptive statistics with respect to STARS variable.
+
+```{r, echo=FALSE}
+mlog <- mlogit.data(winetrains, choice="STARS", shape = "wide")
+
+kable(mlog[1:20, -1])
+
+interp <- cbind.data.frame(mlog$STARS, mlog$chid, mlog$alt)
+kable(interp[1:10, ])
+```
+
+**Interpretation:**
+
+The above table means: From ROW 1 to 4, we have "mlog_alt" which represent the 1st (row 1) persons marked/rated the STARS 1 "mlog_child", but the rating is FALSE, while the 2nd person rated STARS 1 and it was TRUE rating, etc.
+
+
+```{r, echo=FALSE}
+
+mlog2 <- mlogit(STARS ~1 | LabelAppeal, data=mlog, reflevel = 1)
+
+summary(mlog2)
+```
+
+
+**Interpretation:** In reference to the baseline of STARS rating of 1, the likelihood of individual 
+customer liking the label design decreases at a significant P-Value.
+
+```{r, echo=FALSE}
+exp(coef(mlog2))
+
+```
+
+The table below shows the the probabilties of difference ratings with respect to the STARS variable.
+
+```{r, echo=FALSE}
+
+pred_test <- predict(mlog2, winetest, type="prob")
+
+pred_test[1:20, ]
+```
+
+**Note:** From the above, the sum of all row must be eqaul to 1 ( laws of probabilty)
+
+```{r, echo=FALSE}
+mlog3 <- mlogit(STARS ~1 | LabelAppeal, data=mlog, reflevel = 4)
+
+summary(mlog3)
+```
+
+**Interpretation:**
+
+The above individual P-value is not statistically significant, whereas the combined P-value is significant when the baseline is 4 (Excdellent rating), and the Estimate shows the likelihood of individual 
+customer liking the label design decreases.
+
+```{r, echo=FALSE}
+pred_test2 <- predict(mlog3, winetest, type="prob")
+
+pred_test2[1:20, ]
+
+
+```
+
+The above is the prediction values for STARS baseline of 4
+
+
+We will now explore another distribution type of GLM model where the random component is specified by the Poisson distribution of the response variable which is a count
+Poison.
+
+> **POISSON**
+
+```{r, echo=FALSE}
+
+
+winetarget <- glm(TARGET~., family=poisson(link=log),data=winetrains)
+
+summary(winetarget)
+par(mfrow=c(2,1))
+plot(winetarget)
+```
+
+**Null deviance:** 6610.9  on 7073  degrees of freedom means the variance before the inclusion of other parameter
+
+**Residual deviance:** 4382.0  on 7054  degrees of freedom mean the variance after the inclusion of other parameter, hence decrease in the degrees of freedom.
+
+Significance: Only "VolatileAcidity", "LabeAppeals", "AcidIndex" and "STARS" are significant at this estimate.
+
+> **SELECT MODELS:**
+
+A further investigation would be carried out to further scrutinize the data for the model that would yield a better prediction
+
+```{r, echo=FALSE}
+
+selection <- step(winetarget, direction = "backward")
+
+glm_bestmodel <- glm(TARGET~LabelAppeal+STARS+VolatileAcidity, family=poisson(link=log),data=winetrains)
+summary(glm_bestmodel)
+```
+
+A backward model selection was used to select the best model for prediction, and it was revealed that "LabelAppeal", "STARS" and "VolatileAcidity" was selected as best model, but we would want to use Analysis of Variance to Verification.
+
+```{r, echo=FALSE}
+anova(glm_bestmodel, test= "F")
+```
+
+The ANOVA revealed and confirmed that the variable selected was indeed the best model for prediction.
+
+```{r, echo=FALSE}
+confint(glm_bestmodel)
+```
+
+Above confident interval also confirm the model to be significance for prediction and non of the interval diffenrences is eqaul to zero.
+
+
+```{r, echo=FALSE}
+set.seed(123)
+winetrains2 <- winetrains[sample(nrow(winetrains), 7074), ]
+
+poisson_pred <- cbind.data.frame(winetrains2, pred=glm_bestmodel$fitted.values)
+
+kable(poisson_pred[1:10, ])
+```
+
+
+Above is the predicted value.
+
+For example, the exp(linear.predictors) for 1 row in Pred column is 3.693368
+
+```{r, echo=FALSE}
+adc <- glm_bestmodel$linear.predictors
+
+head(adc)
+
+exp(1.3065387)
+```
+
+
+> **Negative Binomial:**
+
+We would now move to another distribution called Negative Binomial, as we can recall, the variance of almost every of the variables was greater that their respective means called **OVERDISPERSION**, this gives us no other option than to verify and adjust this anomally using Negative Binomial.
+
+
+```{r, echo=FALSE}
+
+winetarget_negbin <- glm(TARGET~., family=negative.binomial(theta = 1),data=winetrains)
+summary(winetarget_negbin)
+```
+
+The above is almost thesame with the initial analysis, but now, with the inclusion of Chrlorides. A further investigation is requirred. We will now select the best model for prediction using backward selection method. 
+
+```{r,echo=FALSE}
+selection2 <- step(winetarget_negbin, direction = "backward")
+summary(selection2)
+```
+
+The backward selection method confirms it. A further verification is requirred.
+
+```{r, echo=FALSE}
+selection3 <- glm(TARGET~VolatileAcidity+LabelAppeal+Chlorides+AcidIndex+STARS, family=negative.binomial(theta = 1),data=winetrains)
+```
+
+The analysis of variance (ANOVA) confirmed that the best model would be VolatileAcidity, LabelAppeal, Chlorides, AcidIndex and STARS inclusive.
+
+
+```{r, echo=FALSE}
+anova(selection3, test= "F")
+```
+
+The below confident intervals also confirmed that the selected model are indeed the best for prediction.
+
+```{r, echo=FALSE}
+confint(selection3)
+```
+
+A plot of Residual, fitted and Treatment
+
+```{r, echo=FALSE}
+residual_temp = data.frame(Fitted = fitted(selection3),
+Residuals = resid(selection2), Treatment = winetrains2$STARS)
+
+ggplot(residual_temp, aes(Fitted, Residuals, colour = Treatment)) + geom_point()
+
+
+```
+
+
+> **APPENDIX:**
+
+
+* DATA EXPLORATION
+
+```{r, eval=FALSE}
+options(warn = -1)
+library(MASS);
+library(e1071);
+library(nnet);
+library(knitr);
+library(caTools);
+library(psych)
+suppressMessages(library(ggplot2))
+suppressMessages(library(Amelia));
+suppressMessages(library(mlogit));
+suppressMessages(library(VIM));
+
+winedata <- read.csv ("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/wine-training-data.csv", sep = ",", header = TRUE)
+
+wine_eval <- read.csv("https://raw.githubusercontent.com/mascotinme/MSDA-IS621/master/wine-evaluation-data.csv", sep = ",", header = TRUE)
+
+
+winedata <- subset(winedata, select= -ï..INDEX)
+
+boxplot(winedata, las = 2, par(mar = c(12, 5, 4, 2) + 0.1));
+
+freq <- describe(winedata);
+kable(freq)
+
+mean_var <- cbind.data.frame(names(winedata), freq$mean, freq$sd^2)
+kable(mean_var)
+
+histplot <- aggr(winedata, col=c('green','red'), numbers=TRUE, sortVars=TRUE, labels=names(data), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+missmap(winedata, main = "Missing values vs observed");
+
+suppressMessages(attach(winedata))
+table(STARS)
+```
+
+
+
+> **DATA PREPARATION:**
+
+
+
+```{r, eval=FALSE}
+winedata$STARS <- factor(winedata$STARS);
+winedata$LabelAppeal <- factor(winedata$LabelAppeal);
+
+winedata$STARS[which(is.na(winedata$STARS))] <- 0
+winedata$Sulphates[which(is.na(winedata$Sulphates))] <- 0;
+winedata$TotalSulfurDioxide[which(is.na(winedata$TotalSulfurDioxide))] <- 0;
+winedata$Alcohol[which(is.na(winedata$Alcohol))] <- 0;
+winedata$FreeSulfurDioxide[which(is.na(winedata$FreeSulfurDioxide))] <- 0;
+winedata$Chlorides[which(is.na(winedata$Chlorides))] <- 0;
+winedata$ResidualSugar[which(is.na(winedata$ResidualSugar))] <- 0;
+winedata$pH[which(is.na(winedata$pH))] <- 0;
+
+
+winedata$STARS <- factor(winedata$STARS);
+winedata$LabelAppeal <- factor(winedata$LabelAppeal);
+
+
+
+wine_eval$STARS[which(is.na(wine_eval$STARS))] <- 0
+wine_eval$Sulphates[which(is.na(wine_eval$Sulphates))] <- 0;
+wine_eval$TotalSulfurDioxide[which(is.na(wine_eval$TotalSulfurDioxide))] <- 0;
+wine_eval$Alcohol[which(is.na(wine_eval$Alcohol))] <- 0;
+wine_eval$FreeSulfurDioxide[which(is.na(wine_eval$FreeSulfurDioxide))] <- 0;
+wine_eval$Chlorides[which(is.na(wine_eval$Chlorides))] <- 0;
+wine_eval$ResidualSugar[which(is.na(wine_eval$ResidualSugar))] <- 0;
+wine_eval$pH[which(is.na(wine_eval$pH))] <- 0;
+wine_eval$AcidIndex[which(is.na(wine_eval$AcidIndex))] <- 0
+wine_eval$LabelAppeal[which(is.na(wine_eval$LabelAppeal))] <- 0;
+wine_eval$Density[which(is.na(wine_eval$Density))] <- 0;
+wine_eval$CitricAcid[which(is.na(wine_eval$CitricAcid ))] <- 0;
+wine_eval$VolatileAcidity[which(is.na(wine_eval$VolatileAcidity))] <- 0;
+wine_eval$FixedAcidity[which(is.na(wine_eval$FixedAcidity))] <- 0;
+
+wine_eval$STARS <- factor(wine_eval$STARS);
+wine_eval$LabelAppeal <- factor(wine_eval$LabelAppeal);
+contrasts(wine_eval$STARS) = contr.treatment(5)
+contrasts(wine_eval$LabelAppeal) = contr.treatment(5)
+
+
+
+wine_data <- subset(wine_eval, select=c(-TARGET, -IN))
+
+checking <- xtabs(~  LabelAppeal + STARS , data = winedata);
+
+kable(head(checking, 10));
+
+
+
+set.seed(123)
+split_ins <- sample.split(winedata$TARGET, SplitRatio = 0.75)
+table(split_ins)
+
+9595/(3200+9595)
+
+winetrains <- subset(winedata, split_ins==TRUE)
+winetest <- subset(winedata, split_ins==FALSE)
+
+#stepwise <- step(fit1, direction = "both")
+```
+
+
+> **BUILD MODELS:**
+
+
+```{r, eval=FALSE}
+mlog <- mlogit.data(winetrains, choice="STARS", shape = "wide")
+
+kable(mlog[1:20, -1])
+
+interp <- cbind.data.frame(mlog$STARS, mlog$chid, mlog$alt)
+kable(interp[1:10, ])
+
+
+mlog2 <- mlogit(STARS ~1 | LabelAppeal, data=mlog, reflevel = 1)
+
+summary(mlog2)
+
+exp(coef(mlog2))
+
+
+pred_test <- predict(mlog2, winetest, type="prob")
+
+pred_test[1:20, ]
+
+mlog3 <- mlogit(STARS ~1 | LabelAppeal, data=mlog, reflevel = 4)
+
+summary(mlog3)
+
+pred_test2 <- predict(mlog3, winetest, type="prob")
+
+pred_test2[1:20, ]
+
+
+
+
+
+winetarget <- glm(TARGET~., family=poisson(link=log),data=winetrains)
+
+summary(winetarget)
+par(mfrow=c(2,1))
+plot(winetarget)
+
+
+selection <- step(winetarget, direction = "backward")
+
+glm_bestmodel <- glm(TARGET~LabelAppeal+STARS+VolatileAcidity, family=poisson(link=log),data=winetrains)
+summary(glm_bestmodel)
+
+anova(glm_bestmodel, test= "F")
+
+confint(glm_bestmodel)
+
+set.seed(123)
+winetrains2 <- winetrains[sample(nrow(winetrains), 7074), ]
+
+poisson_pred <- cbind.data.frame(winetrains2, pred=glm_bestmodel$fitted.values)
+
+kable(poisson_pred[1:10, ])
+
+adc <- glm_bestmodel$linear.predictors
+
+head(adc)
+
+exp(1.3065387)
+
+winetarget_negbin <- glm(TARGET~., family=negative.binomial(theta = 1),data=winetrains)
+summary(winetarget_negbin)
+
+selection2 <- step(winetarget_negbin, direction = "backward")
+summary(selection2)
+
+selection3 <- glm(TARGET~VolatileAcidity+LabelAppeal+Chlorides+AcidIndex+STARS, family=negative.binomial(theta = 1),data=winetrains)
+
+anova(selection3, test= "F")
+
+confint(selection3)
+
+residual_temp = data.frame(Fitted = fitted(selection3),
+Residuals = resid(selection2), Treatment = winetrains2$STARS)
+
+ggplot(residual_temp, aes(Fitted, Residuals, colour = Treatment)) + geom_point()
+
+
+winetrains3 <- winetrains2[sample(nrow(winetrains), 500), ]
+
+newdata2 <- data.frame(
+  STARS = rep(seq(from = min(winetrains3$VolatileAcidity), to = max(winetrains3$VolatileAcidity), length.out = 100), 5),
+  LabelAppeal = factor(rep(1:5, each = 100), levels = 1:5, labels =
+  levels(winetrains3$LabelAppeal)))
+
+newdata2 <- cbind(newdata2, predict(glm_bestmodel,winetrains3, type="link", se.fit=TRUE))
+newdata2 <- within(newdata2, {
+  TARGET <- exp(fit)
+  LL <- exp(fit - 1.96 * se.fit)
+  UL <- exp(fit + 1.96 * se.fit)
+})
+
+ggplot(newdata2, aes(winetrains3$VolatileAcidity, winetrains3$TARGET)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = LabelAppeal), alpha = .25) +
+  geom_line(aes(colour = LabelAppeal), size = 2) +
+  labs(x = "VolatileAcidity", y = "Predicted TARGETS")
+
+```
+
